@@ -13,9 +13,6 @@ import gym
 from gym import spaces
 import pygame
 import numpy as np
-from stable_baselines3 import DQN, PPO
-from stable_baselines3.common.vec_env.dummy_vec_env import DummyVecEnv
-from stable_baselines3.common.evaluation import evaluate_policy
 
 
 class GridWorldEnv(gym.Env):
