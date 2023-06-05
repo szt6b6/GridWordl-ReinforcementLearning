@@ -18,16 +18,11 @@ from gridlWorldEnv import GridWorldEnv
 class Net(nn.Module):
     def __init__(self, ):
         super(Net, self).__init__()
-        self.fc1 = nn.Linear(625, 80)
-        self.fc1.weight.data.normal_(0, 0.1)   # initialization
-        self.out = nn.Linear(80, N_ACTIONS)
-        self.out.weight.data.normal_(0, 0.1)   # initialization
+        self.fc1 = nn.Linear(25, 256)
+        self.out = nn.Linear(256, N_ACTIONS)
 
     def forward(self, x):
         # x = torch.nn.functional.one_hot(x, num_classes=5).view(x.shape[0], 5 * N_STATES).float()
-        position = x[:, 0] * 125 + x[:, 1] * 25 + x[:, 2] * 5 + x[:, 3]
-        x = torch.zeros((x.shape[0], 625))
-        x[:, position] = 1
         x = self.fc1(x)
         x = F.relu(x)
         actions_value = self.out(x)
@@ -45,7 +40,7 @@ class DQN(object):
         self.loss_func = nn.MSELoss()
 
     def choose_action(self, x):
-        x = torch.unsqueeze(torch.LongTensor(x), 0)
+        x = torch.unsqueeze(torch.FloatTensor(x), 0)
         # input only one sample
         if np.random.uniform() < EPSILON:   # greedy
             actions_value = self.eval_net.forward(x)
@@ -72,11 +67,11 @@ class DQN(object):
         # sample batch transitions
         sample_index = np.random.choice(MEMORY_CAPACITY, BATCH_SIZE)
         b_memory = self.memory[sample_index, :]
-        b_s = torch.LongTensor(b_memory[:, :N_STATES])
+        b_s = torch.FloatTensor(b_memory[:, :N_STATES])
         b_a = torch.LongTensor(b_memory[:, N_STATES:N_STATES+1].astype(int))
         b_r = torch.FloatTensor(b_memory[:, N_STATES+1:N_STATES+2])
-        b_s_ = torch.LongTensor(b_memory[:, N_STATES+2:-1])
-        done_ = torch.LongTensor(b_memory[:, -1:])
+        b_s_ = torch.FloatTensor(b_memory[:, N_STATES+2:-1])
+        done_ = torch.FloatTensor(b_memory[:, -1:])
 
         # q_eval w.r.t the action in experience
         q_eval = self.eval_net(b_s).gather(1, b_a)  # shape (batch, 1)
@@ -90,7 +85,7 @@ class DQN(object):
 
 def train(dqn):
     for i_episode in range(EPOCHS):
-        s = env.reset()[0]
+        s = env.reset()
         ep_r = 0
         while True:
             if(np.random.rand(1) < EPSILON):
@@ -99,7 +94,7 @@ def train(dqn):
                 a = env.action_space.sample()
 
             # take action
-            s_, r, done, truncted, info = env.step(a)
+            s_, r, done, info = env.step(a)
 
             dqn.store_transition(s, a, r, s_, done)
 
@@ -115,7 +110,7 @@ def train(dqn):
             s = s_
 
 def choose_action(x, net):
-    x = torch.unsqueeze(torch.LongTensor(x), 0)
+    x = torch.unsqueeze(torch.FloatTensor(x), 0)
     # input only one sample
     if np.random.uniform() < EPSILON:   # greedy
         actions_value = net.forward(x)
@@ -132,33 +127,35 @@ def test():
     print('\ntesting...')
     net = torch.load("net_eval.pth")
 
-    s = env.reset()[0]
-    for _ in range(10):
+    s = env.reset()
+    for i in range(50):
+        a_r = 0
         while True:
             env.render()
             a = choose_action(s, net)
 
             # take action
-            s_, r, done, truncted, info = env.step(a)
-
-            if(done or truncted):
-                env.reset()
+            s, r, done, info = env.step(a)
+            a_r += r
+            if(done):
+                print("第 %d 次游戏, 累计奖励 %.2f" % (i, a_r))
+                s = env.reset()
                 break
     env.close()
 
 # Hyper Parameters
-BATCH_SIZE = 32
-LR = 0.001                   # learning rate
+BATCH_SIZE = 256
+LR = 0.0005                   # learning rate
 EPSILON = 0.9               # greedy policy
 GAMMA = 0.9                 # reward discount
 TARGET_REPLACE_ITER = 100   # target update frequency
-MEMORY_CAPACITY = 2000
+MEMORY_CAPACITY = 10000
 env = GridWorldEnv(size=5)
 env = env.unwrapped
 N_ACTIONS = env.action_space.n
-N_STATES = 4
+N_STATES = 25
 ENV_A_SHAPE = 0 if isinstance(env.action_space.sample(), int) else env.action_space.sample().shape     # to confirm the shape
-EPOCHS = 4000
+EPOCHS = 8000
 
 dqn = DQN()
 train(dqn)

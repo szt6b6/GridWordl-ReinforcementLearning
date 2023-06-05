@@ -1,5 +1,5 @@
 import numpy as np
-from gridlWorldEnv import GridWorldEnv
+from gridlWorldEnv_qlearning import GridWorldEnv
 
 epsilon = 0.9       
 gamma = 0.95         
